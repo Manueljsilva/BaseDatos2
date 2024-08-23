@@ -68,7 +68,7 @@ public:
     }
     void add(Matricula m){
         ofstream datafile(dataFilename, ios::out | ios::binary | ios::app );
-        ofstream metafile(metaFilename, ios::binary | ios::app );
+        ofstream metafile(metaFilename, ios::out | ios::binary | ios::app );
         if(!datafile.is_open() || !metafile.is_open()){
             cout<<"Error al abrir el archivo"<<endl;
             exit(1);
@@ -105,6 +105,11 @@ public:
         datafile.close();
         metafile.close();
         return m;
+    }
+    //destroy
+    ~VariableRecord(){
+        remove(dataFilename.c_str());
+        remove(metaFilename.c_str());
     }
 
 };

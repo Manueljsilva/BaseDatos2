@@ -2,6 +2,7 @@
 #include<fstream>
 #include<vector>
 #include<string>
+#include<unordered_set>
 #include<algorithm>
 
 
@@ -45,7 +46,8 @@ private:
     string filename ; 
     DeleteType deletetype;
     int cantRegistros;
-    vector<int> freeList;
+    //vector<int> freeList;
+    unordered_set<int> freeList;
 public:
     FixedRecord(string filename, DeleteType deletetype) {
         this->filename = filename;
@@ -63,21 +65,28 @@ public:
         } 
         if(cantRegistros == 0){cout << "No hay registros" << endl;}
         if(deletetype == MOVE_THE_LAST){
-            int i = cantRegistros;
-            while(i > 0){
+            while(true){
+                if(file.eof()) break;
                 Alumno al;
-                file.seekg((cantRegistros - i)*sizeof(Alumno), ios::beg);
                 file >> al;
-                alumnos.push_back(al);
-                i--;
+                int currentPos = file.tellg() / sizeof(Alumno) ; // posicion actual comienza en 0
+                if(currentPos < cantRegistros){
+                    alumnos.push_back(al);
+                }else{
+                    break;
+                }  
             }
         }else if(deletetype == FREE_LIST){
-            for(int i = 0; i < cantRegistros; i++){
-                if(find(freeList.begin(), freeList.end(), i) == freeList.end()){
-                    Alumno al;
-                    file.seekg(i*sizeof(Alumno), ios::beg);
-                    file >> al;
+            while(true){
+                if(file.eof()) break;
+                Alumno al;
+                file >> al;
+                int currentPos = file.tellg() / sizeof(Alumno) ; // posicion actual comienza en 0
+                if(find(freeList.begin(), freeList.end(), currentPos) == freeList.end()){
                     alumnos.push_back(al);
+                } else {
+                    cout << "el registro de la posicion " << currentPos << " fue eliminado" << endl;
+                    exit(1);
                 }
             }
         }
@@ -91,32 +100,32 @@ public:
             exit(1);
         }
         if(deletetype == MOVE_THE_LAST){
-            file.seekp((cantRegistros)*sizeof(Alumno), ios::beg);
+            
             file << record;
             cantRegistros++;
         }else if(deletetype == FREE_LIST){
             if(!freeList.empty()){
-                int pos = freeList.back(); // obtiene la ultima posicion libre
-                freeList.pop_back();        //elimina la ultima posicion libre
+                int pos = *freeList.begin();
+                freeList.erase(freeList.begin());
                 file.seekp(pos*sizeof(Alumno), ios::beg);
                 file << record;
             }else{
-                file.seekp((cantRegistros)*sizeof(Alumno), ios::beg);
+                file.seekp((cantRegistros -1)*sizeof(Alumno), ios::beg);
                 file << record;
                 cantRegistros++;
             }
         }
         file.close();
     }
-    Alumno readRedcord(int pos) {
+    Alumno readRecord(int pos) {
         Alumno al;
         ifstream file(filename, ios::in | ios::binary) ;
         if(!file.is_open()){
             cout<<"No se puede abrir" <<endl ; 
             exit(1);
         }
-        if(pos >= cantRegistros){
-            cout << "Posicion invalida" << endl;
+        if(pos > cantRegistros){
+            cout << "Posicion invalida read record" << endl;
             file.close();
             exit(1);
         }
@@ -143,24 +152,24 @@ public:
             exit(1);
         }
         if(pos >= cantRegistros){
-            cout << "Posicion invalida" << endl;
+            cout << "Posicion invalida delete" << endl;
             file.close();
             return false;
         }
         // move the last quiere decir que mueve el ultimo registro a la posicion que se quiere eliminar
         if(deletetype == MOVE_THE_LAST){
-            int lastPos = cantRegistros - 1;
-            Alumno lastAlumno = readRedcord(lastPos);
+            int lastPos = cantRegistros;
+            Alumno lastAlumno = readRecord(lastPos);
             file.seekp(pos*sizeof(Alumno), ios::beg);
             file << lastAlumno;
             cantRegistros--;
         }
         // free list quiere decir que se va a tener una lista de registros libres
         else if(deletetype == FREE_LIST){
-            if(find(freeList.begin(), freeList.end(), pos) == freeList.end()){
-                freeList.push_back(pos);
+            if(freeList.find(pos) == freeList.end()){
+                freeList.insert(pos);
             }else{
-                cout << "el registro de la posicion " << pos << " ya fue eliminado" << endl;
+                cout << "El registro ya fue eliminado" << endl;
                 file.close();
                 return false;
             }
@@ -177,7 +186,9 @@ public:
         }
     }
     // destructor
-    ~FixedRecord(){}
+    ~FixedRecord(){
+        remove(filename.c_str());
+    }
 
 };
 
@@ -188,11 +199,13 @@ void Test_MovetheLast(){
     Alumno a2 = {"5678", "Maria", "Lopez", "Industrial", 6, 250.0};
     Alumno a3 = {"9101", "Pedro", "Gomez", "Civil", 7, 300.0};
     Alumno a4 = {"1121", "Ana", "Torres", "Mecanica", 8, 350.0};
+
     //agregando alumnos 
     fr.add(a1);
     fr.add(a2);
     fr.add(a3);
     fr.add(a4);
+    cout<< fr.CantRegistros() << endl;
     //leyendo los alumnos
     cout<< "-------Leyendo los alumnos-------" << endl;
     vector<Alumno> alumnos = fr.load();
@@ -202,12 +215,13 @@ void Test_MovetheLast(){
     cout << "----------------" << endl;
     cout << "-------leyendo un registro espesifico-------" << endl;
     //leer un registro especifico
-    Alumno al = fr.readRedcord(2);
+    Alumno al = fr.readRecord(2);
     cout << al.codigo << " " << al.nombre << " " << al.apellidos << " " << al.carrera << " " << al.ciclo << " " << al.mensualidad << endl;
     cout << "----------------" << endl;
     cout << "Eliminando un registro , el primero" << endl;
     //eliminar un registro
     fr.deleteRecord(0);
+    cout<< fr.CantRegistros() << endl;
 
     cout << "----------------" << endl;
     cout << "------- Leyendo los alumnos despues de eliminar -------" << endl;
@@ -216,6 +230,18 @@ void Test_MovetheLast(){
     for(Alumno al : alumnos){
         cout << al.codigo << " " << al.nombre << " " << al.apellidos << " " << al.carrera << " " << al.ciclo << " " << al.mensualidad << endl;
     }
+    cout<< "-----------agregando un nuevo alumno-----------" << endl;
+    //agregando un nuevo alumno
+    Alumno a5 = {"1314", "Luis", "Garcia", "Sistemas", 5, 200.0};
+    fr.add(a5);
+    cout << "----------leyendo los alumnos despues de agregar un nuevo alumno----------" << endl;
+    //leyendo los alumnos
+    alumnos = fr.load();
+    for(Alumno al : alumnos){
+        cout << al.codigo << " " << al.nombre << " " << al.apellidos << " " << al.carrera << " " << al.ciclo << " " << al.mensualidad << endl;
+    }
+    cout<< fr.CantRegistros() << endl;
+    cout << "----------------" << endl;
 }
 
 void Test_FreeList(){
@@ -239,7 +265,7 @@ void Test_FreeList(){
     cout << "----------------" << endl;
     cout << "-------leyendo un registro espesifico-------" << endl;
     //leer un registro especifico
-    Alumno al = fr.readRedcord(2);
+    Alumno al = fr.readRecord(2);
     cout << al.codigo << " " << al.nombre << " " << al.apellidos << " " << al.carrera << " " << al.ciclo << " " << al.mensualidad << endl;
     cout << "----------------" << endl;
     cout << "Eliminando un registro , el segundo" << endl;
@@ -268,8 +294,10 @@ void Test_FreeList(){
     cout << "----------------" << endl;
 }
 int main(){
-    //Test_MovetheLast();
-    Test_FreeList();
+    cout<< "--------------------------------probando movethelast--------------------------------" << endl;
+    Test_MovetheLast();
+    cout<< "--------------------------------probando freelist--------------------------------" << endl;
+    //Test_FreeList();
 
     return 0; 
 }

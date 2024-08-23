@@ -108,8 +108,8 @@ public:
     }
     //destroy
     ~VariableRecord(){
-        remove(dataFilename.c_str());
-        remove(metaFilename.c_str());
+        //remove(dataFilename.c_str());
+        //remove(metaFilename.c_str());
     }
 
 };

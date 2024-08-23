@@ -189,7 +189,7 @@ public:
     }
     // destructor
     ~FixedRecord(){
-        remove(filename.c_str());
+        //remove(filename.c_str());
     }
 
 };

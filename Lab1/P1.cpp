@@ -179,10 +179,12 @@ public:
         return true;
     }
     int CantRegistros(){
-        if(deletetype == MOVE_THE_LAST){
+        if(deletetype == MOVE_THE_LAST) {
             return cantRegistros;
-        }else if(deletetype == FREE_LIST){
+        } else if(deletetype == FREE_LIST) {
             return cantRegistros - freeList.size();
+        } else {
+            return 0; // valor por defecto
         }
     }
     // destructor
@@ -213,7 +215,7 @@ void Test_MovetheLast(){
         cout << al.codigo << " " << al.nombre << " " << al.apellidos << " " << al.carrera << " " << al.ciclo << " " << al.mensualidad << endl;
     }
     cout << "----------------" << endl;
-    cout << "-------leyendo un registro espesifico-------" << endl;
+    cout << "-------leyendo un registro especifico-------" << endl;
     //leer un registro especifico
     Alumno al = fr.readRecord(2);
     cout << al.codigo << " " << al.nombre << " " << al.apellidos << " " << al.carrera << " " << al.ciclo << " " << al.mensualidad << endl;
@@ -224,7 +226,7 @@ void Test_MovetheLast(){
     cout<< fr.CantRegistros() << endl;
 
     cout << "----------------" << endl;
-    cout << "------- Leyendo los alumnos despues de eliminar -------" << endl;
+    cout << "------- leyendo los alumnos despues de eliminar -------" << endl;
     //leyendo los alumnos
     alumnos = fr.load();
     for(Alumno al : alumnos){

@@ -3,22 +3,11 @@
 #include<vector>
 #include<string>
 
-
 using namespace std; 
 
-
-
-// struct Alumno{
-//     char codigo[5]; 
-//     char nombre[11];
-//     char apellidos[20];
-//     char carrera[15];
-//     int ciclo;
-//     float mensualidad;
-//     int next = -2;
-// };
-
-#pragma pack(push, 1) // Guardar el estado actual del empaquetado y establecer empaquetado de 1 byte
+#pragma pack(push, 1) // los miembros de la estructura se colocarán en la memoria uno tras otro sin introducir bytes de relleno (ALINEAMIENTO DE 1 byte)
+// asegura que la estructura "Alumno" sea empaquetada sin ningún byte de relleno, esto permite que el tamaño de la estructura sea exactamente la suma de los tamaños de sus miembros.
+// De esta manera el tamaño y los datos en la estructura coincide con lo que se escribe y lee en el archivo binario.
 struct Alumno{
     char codigo[5]; 
     char nombre[11];
@@ -104,16 +93,19 @@ public:
             cout<<"No se puede abrir el archivo" <<endl ; 
             exit(1);
         }
-        //file.seekp(0, ios::beg);
+
+        // si hay un registro eliminado, se reutiliza su posición
         if(candetele > 0){
-            // file.seekp(candetele-1*(sizeof(Alumno)), ios::beg);
-            file.seekp(0, ios::end);
-            file << record;
-            candetele--;
-        }else {
-            file.seekp(0, ios::end);
-            file << record;
+            int posToReuse = CantReg(); // aquí capturo la posición del último registro
+            file.seekp(posToReuse * sizeof(Alumno), ios::beg); // redirecciono el cursor en la posición a reutilizar
+            candetele--; // reduzco contador de registros eliminados
         }
+        // si no hay registros eliminados, agrego al final
+        else {
+            file.seekp(0, ios::end);
+        }
+
+        file << record;
         file.close();
     }
 
@@ -134,6 +126,7 @@ public:
     bool deleteRecord(int pos) override{
         ofstream file(filename, ios::in | ios::out | ios::binary);
         if(!file.is_open()) throw ("No se pudo abrir el archivo");
+        
         int AllReg = CantReg();
         if(pos >= AllReg) {
             cout << "No se puede eliminar el registro" << endl;
@@ -142,10 +135,14 @@ public:
         }
         int lastPos = AllReg - 1;
         Alumno lastRecord = readRecord(lastPos);
-        file.seekp(pos * sizeof(Alumno), ios::beg);
-        file << lastRecord;
-        file.close();
+
+        if (pos != lastPos){
+            file.seekp(pos * sizeof(Alumno), ios::beg);
+            file << lastRecord;
+        }
+
         candetele++;
+        file.close();
         return true;
     }
 
@@ -220,9 +217,9 @@ void PruebaMoveTheLast(){
     }
 
     cout<<"---------------------------------" << endl;
-    //legendo un registro especifico 
+    //leyendo un registro especifico 
     int pos = 2;
-    cout << "legendo el registro en la posicion " << pos << ":" << endl; 
+    cout << "Leyendo el registro en la posicion " << pos << ":" << endl; 
     Alumno a = file->readRecord(pos);
     cout << a.codigo << " " << a.nombre << " " << a.apellidos << " " << a.carrera << " " << a.ciclo << " " << a.mensualidad << endl;
 
@@ -243,7 +240,7 @@ void PruebaMoveTheLast(){
     }
 
     cout << "---------------------------------" << endl;
-    //agregadno un nuevo registro
+    //agregando un nuevo registro
     cout << "Agregando un nuevo registro" << endl;
     Alumno a5 = {"1313", "Luis", "Garcia", "Mecatronica", 9, 400.0};
     file->add(a5);

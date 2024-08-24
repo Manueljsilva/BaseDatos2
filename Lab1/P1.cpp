@@ -42,7 +42,14 @@ class FixedRecord{
 protected:
     string filename ; 
 public:
-    FixedRecord(string filename): filename(filename) {}
+    FixedRecord(string filename): filename(filename) {
+        ofstream file(filename, ios::app | ios::binary);
+        if(!file.is_open()){
+            cout<<"No se puede abrir el archivo" <<endl ; 
+            exit(1);
+        }
+        file.close();
+    }
     virtual vector<Alumno> load() = 0;
     virtual void add(Alumno alumno) = 0;
     virtual Alumno readRecord(int pos) = 0;
@@ -138,6 +145,11 @@ private:
 public:
     FixedRecordWithFreeList(string filename): FixedRecord(filename) {}
     vector<Alumno> load() override{
+        vector<Alumno> alumnos;
+        ifstream file(filename, ios::in | ios::binary);
+        //implementar
+
+        return alumnos;
     }
     void add(Alumno record) override{
         ofstream file(filename, ios::in | ios::out | ios::binary);

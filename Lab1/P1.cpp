@@ -8,6 +8,17 @@ using namespace std;
 
 
 
+// struct Alumno{
+//     char codigo[5]; 
+//     char nombre[11];
+//     char apellidos[20];
+//     char carrera[15];
+//     int ciclo;
+//     float mensualidad;
+//     int next = -2;
+// };
+
+#pragma pack(push, 1) // Guardar el estado actual del empaquetado y establecer empaquetado de 1 byte
 struct Alumno{
     char codigo[5]; 
     char nombre[11];
@@ -17,6 +28,8 @@ struct Alumno{
     float mensualidad;
     int next = -2;
 };
+#pragma pack(pop) // Restaurar el estado anterior del empaquetado
+
 
 void operator >>(ifstream&stream , Alumno &p){
     stream.read(p.codigo, 5); 
@@ -61,17 +74,22 @@ public:
 class FixedRecordWithMoveTheLast: public FixedRecord{
 private:
     int candetele = 0;
+
 public:
     FixedRecordWithMoveTheLast(string filename): FixedRecord(filename) {}
-    vector<Alumno> load() override{
+
+    vector<Alumno> load() override {
         vector<Alumno> alumnos;
         ifstream file(filename, ios::in | ios::binary);
-        if(!file.is_open()) throw ("No se pudo abrir el archivo");
-        if(CantReg() == 0){cout << "No hay registros" << endl;}
+        if (!file.is_open()) throw ("No se pudo abrir el archivo");
+        if (CantReg() == 0) {
+            cout << "No hay registros" << endl;
+            return alumnos;
+        }
         file.seekg(0, ios::beg);
 
-        int size = CantReg() + 1 - candetele;
-        for(int i = 0; i < size; i++){
+        int totalRecords = CantReg();
+        for (int i = 0; i < totalRecords; i++) {
             Alumno al;
             file >> al;
             alumnos.push_back(al);
@@ -79,6 +97,7 @@ public:
         file.close();
         return alumnos;
     }
+
     void add(Alumno record) override{
         ofstream file(filename, ios::out | ios::in | ios::binary);
         if(!file.is_open()){
@@ -87,7 +106,8 @@ public:
         }
         //file.seekp(0, ios::beg);
         if(candetele > 0){
-            file.seekp(candetele-1*(sizeof(Alumno)), ios::end);
+            // file.seekp(candetele-1*(sizeof(Alumno)), ios::beg);
+            file.seekp(0, ios::end);
             file << record;
             candetele--;
         }else {
@@ -96,6 +116,7 @@ public:
         }
         file.close();
     }
+
     Alumno readRecord(int pos) override{
         Alumno record;
         ifstream file(filename, ios::binary);
@@ -104,11 +125,12 @@ public:
             exit(1);
         };
 
-        file.seekg(pos * (sizeof(Alumno)-1), ios::beg);
+        file.seekg(pos * (sizeof(Alumno)), ios::beg);
         file >> record;
         file.close();
         return record;
     }
+
     bool deleteRecord(int pos) override{
         ofstream file(filename, ios::in | ios::out | ios::binary);
         if(!file.is_open()) throw ("No se pudo abrir el archivo");
@@ -118,30 +140,35 @@ public:
             file.close();
             return false;
         }
-        int lastPos = AllReg ;
+        int lastPos = AllReg - 1;
         Alumno lastRecord = readRecord(lastPos);
         file.seekp(pos * sizeof(Alumno), ios::beg);
         file << lastRecord;
-        candetele++;
         file.close();
+        candetele++;
         return true;
     }
-    int CantReg() override{
+
+    int CantReg() override {
         ifstream file(filename, ios::binary | ios::in);
         file.seekg(0, ios::end);
         int size = file.tellg();
         file.close();
-        return size / sizeof(Alumno);
+        return (size / sizeof(Alumno)) - candetele;
     }
+
     //destructor
     ~FixedRecordWithMoveTheLast(){
         //remove(filename.c_str());
     }
 };
 
+// Alexis
+
 class FixedRecordWithFreeList: public FixedRecord{
 private:
     int header = -1; // indica la posicion del primer registro libre
+
 public:
     FixedRecordWithFreeList(string filename): FixedRecord(filename) {}
     vector<Alumno> load() override{
@@ -183,6 +210,8 @@ void PruebaMoveTheLast(){
     file->add(a3);
     file->add(a4);
 
+    cout << "Cantidad de registros: " << file->CantReg() << endl;
+
     //leyendo alumnos
     cout<< "-------Leyendo los alumnos-------" << endl;
     vector<Alumno> alumnos = file->load();
@@ -203,6 +232,8 @@ void PruebaMoveTheLast(){
     cout << "Eliminando el registro " << posElim << endl;
     file->deleteRecord(posElim);
 
+    cout << "Cantidad de registros: " << file->CantReg() << endl;
+
     cout<<"---------------------------------" << endl;
     //leyendo alumnos
     cout<< "-------Leyendo los alumnos despues de eliminar un registro-------" << endl;
@@ -216,6 +247,9 @@ void PruebaMoveTheLast(){
     cout << "Agregando un nuevo registro" << endl;
     Alumno a5 = {"1313", "Luis", "Garcia", "Mecatronica", 9, 400.0};
     file->add(a5);
+
+    cout << "Cantidad de registros: " << file->CantReg() << endl;
+
     cout << "---------------------------------" << endl;
     //leyendo alumnos
     cout<< "-------Leyendo los alumnos despues de agregar un registro-------" << endl;
@@ -223,13 +257,14 @@ void PruebaMoveTheLast(){
     for(Alumno a: alumnos){
         cout << a.codigo << " " << a.nombre << " " << a.apellidos << " " << a.carrera << " " << a.ciclo << " " << a.mensualidad << endl;
     }
+
+    cout << "Cantidad de registros: " << file->CantReg() << endl;
 }
 
 
 int main(){
     cout << "--------------------------------probando movethelast--------------------------------" << endl;
     PruebaMoveTheLast();
-
 
     return 0 ; 
 }

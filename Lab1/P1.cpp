@@ -15,6 +15,10 @@ struct Alumno{
     char carrera[15];
     int ciclo;
     float mensualidad;
+    int next = -2;
+    // int next // posicion del siguiente registro en la lista de registros libres // free list
+    /* si el next es -2 es porque no ha sido eliminado , si es -1 quiere decir que no hay 
+    ningun elimando y es el ultimo , osea de ahi se pone el nuevo valor,  y si son valores como 1, 2 ,5 son los eliminados*/
 };
 
 void operator >>(ifstream&stream , Alumno &p){
@@ -24,6 +28,7 @@ void operator >>(ifstream&stream , Alumno &p){
     stream.read(p.carrera, 15);
     stream.read((char*)&p.ciclo, sizeof(int));
     stream.read((char*)&p.mensualidad, sizeof(float));
+    stream.read((char*)&p.next, sizeof(int));
 }
 void operator <<(ofstream&stream , Alumno &p){
     stream.write(p.codigo, 5);
@@ -32,6 +37,7 @@ void operator <<(ofstream&stream , Alumno &p){
     stream.write(p.carrera, 15);
     stream.write((char*)&p.ciclo, sizeof(int));
     stream.write((char*)&p.mensualidad, sizeof(float));
+    stream.write((char*)&p.next, sizeof(int));
 }
 
 enum DeleteType{
@@ -43,26 +49,30 @@ class FixedRecord{
 private:
     string filename ; 
     DeleteType deletetype;
+    int candetele = 0;
 public:
     FixedRecord(string filename, DeleteType deletetype) {
         this->filename = filename;
         this->deletetype = deletetype;
+        candetele = 0 ; 
     }
 
     vector<Alumno> load(){
         vector<Alumno> alumnos;
         ifstream file(filename, ios::in | ios::binary);
         if(!file.is_open()){
-            cout<<"No se puede abrir" <<endl ; 
+            cout<<"No se puede abrir load" <<endl ; 
             exit(1);
         } 
         if(CantRegistros() == 0){cout << "No hay registros" << endl;}
+        file.seekg(0, ios::beg);
+        
         if(deletetype == MOVE_THE_LAST){
-            while(true){
-                Alumno alumno;
-                file >> alumno;
-                if(file.eof()) break;
-                alumnos.push_back(alumno);
+            int size = CantRegistros() + 1 - candetele;
+            for(int i = 0; i < size; i++){
+                Alumno al;
+                file >> al;
+                alumnos.push_back(al);
             }
         }else if(deletetype == FREE_LIST){
             // free list
@@ -71,13 +81,20 @@ public:
         return alumnos;
     }
     void add(Alumno record){
-        ofstream file(filename, ios::out | ios::app | ios::binary); 
+        ofstream file(filename, ios::out | ios:: in | ios::binary); 
         if(!file.is_open()){
-            cout<<"No se puede abrir" <<endl ; 
+            cout<<"No se puede abrir record" <<endl ; 
             exit(1);
         }
         if(deletetype == MOVE_THE_LAST){
-            file << record;
+            if(candetele > 0){
+                file.seekp(candetele-1*(sizeof(Alumno)), ios::end);
+                file << record;
+                candetele--;
+            }else{
+                file.seekp(0, ios::end);
+                file << record;
+            }
         }else if(deletetype == FREE_LIST){
             //free list
         }
@@ -111,17 +128,24 @@ public:
             cout<<"No se puede abrir" <<endl ; 
             exit(1);
         }
+        int totalRegistros = CantRegistros();
         if(pos >= CantRegistros()){
             cout << "Posicion invalida delete" << endl;
             file.close();
             return false;
         }
         if(deletetype == MOVE_THE_LAST){
-            int lastPos = CantRegistros();
+            int lastPos = totalRegistros;
             Alumno lastAlumno = readRecord(lastPos);
-            file.seekp(pos*sizeof(Alumno), ios::beg);
+            file.seekp(pos*(sizeof(Alumno)), ios::beg);
             file << lastAlumno;
-        }
+            file.seekp(lastPos+1*(sizeof(Alumno)+1), ios::cur);
+            file.seekp(-1*(sizeof(Alumno)), ios::cur);
+            //file.seekp(0, ios::beg);
+            //int records = totalRegistros - 1;
+            //file.write((char*)&records, sizeof(Alumno));
+            candetele++;
+            }
         else if(deletetype == FREE_LIST){
             // free list
         }
@@ -129,6 +153,8 @@ public:
         file.close();
         return true;
     }
+    //seekp = escritura <<
+    //seekg = lectura >>
     int CantRegistros(){
         if(deletetype == MOVE_THE_LAST) {
             ifstream file(filename, ios::in | ios::binary);
@@ -144,7 +170,7 @@ public:
     }
     // destructor
     ~FixedRecord(){
-        remove(filename.c_str());
+        //remove(filename.c_str());
     }
 
 };
@@ -168,6 +194,7 @@ void Test_MovetheLast(){
     for(Alumno al : alumnos){
         cout << al.codigo << " " << al.nombre << " " << al.apellidos << " " << al.carrera << " " << al.ciclo << " " << al.mensualidad << endl;
     }
+    cout << "total de registros: " << fr.CantRegistros() << endl;
     cout << "----------------" << endl;
     cout << "-------leyendo un registro especifico-------" << endl;
     //leer un registro especifico

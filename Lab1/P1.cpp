@@ -74,7 +74,7 @@ public:
             cout << "No hay registros" << endl;
             return alumnos;
         }
-        file.seekg(0, ios::beg);
+        // file.seekg(0, ios::beg);
 
         int totalRecords = CantReg();
         for (int i = 0; i < totalRecords; i++) {
@@ -101,7 +101,7 @@ public:
         }
         // si no hay registros eliminados, agrego al final
         else {
-            file.seekp(0, ios::end);
+            file.seekp(0, ios::end); // redirecciono el cursor a la posición final
         }
 
         file << record;
@@ -174,7 +174,7 @@ public:
             cout<<"No se puede abrir el archivo" <<endl ; 
             exit(1);
         }
-        file.seekg(0, ios::beg);
+        // file.seekg(0, ios::beg);
         while(true){
             Alumno al ; 
             streampos pos = file.tellg();
@@ -189,6 +189,7 @@ public:
 
         return alumnos;
     }
+
     //ofstream es para escribir en el archivo
     void add(Alumno record) override{
         fstream file(filename, ios::in | ios::out | ios::binary);
@@ -233,6 +234,7 @@ public:
         file.seekg(pos * sizeof(Alumno), ios::beg);
         file >> record;
         file.close(); 
+
         return record;
     }
 
@@ -247,19 +249,31 @@ public:
         file.write((char*)&next, sizeof(int));
         header = pos;
         file.close();
+
         return true;
     }
 
     int CantReg() override {
-        // falta
-        return 0;
-    }
+        ifstream file(filename, ios::in | ios::binary);
+        int count = 0;
+        Alumno al;
 
+        // es necesario recorrer cada registro del archivo para identificar el valor del campo que me indica que no es un registro eliminados (.next)
+        while (true) {
+            file.read((char*)&al, sizeof(Alumno));
+            if (file.eof()) break;
+            // cuento registros no eliminados
+            if (al.next == -2) count++;
+        }
+        file.close();
+
+        return count;
+    }
 };
 
 // prueba de la clase MoveTheLast
 void PruebaMoveTheLast(){
-    FixedRecord* file = new FixedRecordWithMoveTheLast("alumnos.dat");
+    FixedRecord* file = new FixedRecordWithMoveTheLast("alumnosMTL.dat");
     //FixedRecordWithMoveTheLast file("alumnos.dat");
     
     Alumno a1 = {"1234", "Juan", "Perez", "Sistemas", 5, 200.0};
@@ -273,7 +287,6 @@ void PruebaMoveTheLast(){
     file->add(a3);
     file->add(a4);
 
-    //cout << "Cantidad de registros: " << file->CantReg() << endl;
 
     //leyendo alumnos
     cout<< "-------Leyendo los alumnos-------" << endl;
@@ -281,6 +294,7 @@ void PruebaMoveTheLast(){
     for(Alumno a: alumnos){
         cout << a.codigo << " " << a.nombre << " " << a.apellidos << " " << a.carrera << " " << a.ciclo << " " << a.mensualidad << endl;
     }
+    cout << "Cantidad de registros: " << file->CantReg() << endl;
 
     cout<<"---------------------------------" << endl;
     //leyendo un registro especifico 
@@ -326,7 +340,7 @@ void PruebaMoveTheLast(){
 
 // prueba de la clase FreeList
 void PruebaFreeList(){
-    FixedRecord* file = new FixedRecordWithFreeList("alumnos.dat");
+    FixedRecord* file = new FixedRecordWithFreeList("alumnosFL.dat");
     //FixedRecordWithFreeList file("alumnos.dat");
     
     Alumno a1 = {"1234", "Juan", "Perez", "Sistemas", 5, 200.0};
@@ -340,7 +354,6 @@ void PruebaFreeList(){
     file->add(a3);
     file->add(a4);
 
-    cout << "Cantidad de registros: " << file->CantReg() << endl;
 
     //leyendo alumnos
     cout<< "-------Leyendo los alumnos-------" << endl;
@@ -348,6 +361,8 @@ void PruebaFreeList(){
     for(Alumno a: alumnos){
         cout << a.codigo << " " << a.nombre << " " << a.apellidos << " " << a.carrera << " " << a.ciclo << " " << a.mensualidad << endl;
     }
+
+    cout << "Cantidad de registros: " << file->CantReg() << endl;
 
     cout<<"---------------------------------" << endl;
     //leyendo un registro especifico 
@@ -362,7 +377,7 @@ void PruebaFreeList(){
     cout << "Eliminando el registro " << posElim << endl;
     file->deleteRecord(posElim);
 
-    //cout << "Cantidad de registros: " << file->CantReg() << endl;
+    cout << "Cantidad de registros: " << file->CantReg() << endl;
 
     cout<<"---------------------------------" << endl;
     //leyendo alumnos
@@ -378,7 +393,7 @@ void PruebaFreeList(){
     Alumno a5 = {"1313", "Luis", "Garcia", "Mecatronica", 9, 400.0};
     file->add(a5);
 
-    //cout << "Cantidad de registros: " << file->CantReg() << endl;
+    cout << "Cantidad de registros: " << file->CantReg() << endl;
 
     cout << "---------------------------------" << endl;
     //leyendo alumnos
@@ -388,12 +403,12 @@ void PruebaFreeList(){
         cout << a.codigo << " " << a.nombre << " " << a.apellidos << " " << a.carrera << " " << a.ciclo << " " << a.mensualidad << endl;
     }
 
-    //cout << "Cantidad de registros: " << file->CantReg() << endl;
+    cout << "Cantidad de registros: " << file->CantReg() << endl;
 }
 
 int main(){
-    cout << "--------------------------------probando movethelast--------------------------------" << endl;
-    PruebaMoveTheLast();
+    // cout << "--------------------------------probando movethelast--------------------------------" << endl;
+    // PruebaMoveTheLast();
     cout << "--------------------------------probando freelist--------------------------------" << endl;
     PruebaFreeList();
 

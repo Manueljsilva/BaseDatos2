@@ -187,6 +187,7 @@ public:
             }
         }
 
+        file.close();
         return alumnos;
     }
 
@@ -407,8 +408,8 @@ void PruebaFreeList(){
 }
 
 int main(){
-    // cout << "--------------------------------probando movethelast--------------------------------" << endl;
-    // PruebaMoveTheLast();
+    cout << "--------------------------------probando movethelast--------------------------------" << endl;
+    PruebaMoveTheLast();
     cout << "--------------------------------probando freelist--------------------------------" << endl;
     PruebaFreeList();
 

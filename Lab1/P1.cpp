@@ -20,7 +20,7 @@ struct Alumno{
 #pragma pack(pop) // Restaurar el estado anterior del empaquetado
 
 
-void operator >>(ifstream&stream , Alumno &p){
+void operator >>(fstream&stream , Alumno &p){
     stream.read(p.codigo, 5); 
     stream.read(p.nombre, 11);
     stream.read(p.apellidos, 20);
@@ -29,7 +29,7 @@ void operator >>(ifstream&stream , Alumno &p){
     stream.read((char*)&p.mensualidad, sizeof(float));
     stream.read((char*)&p.next, sizeof(int));
 }
-void operator <<(ofstream&stream , Alumno &p){
+void operator <<(fstream&stream , Alumno &p){
     stream.write(p.codigo, 5);
     stream.write(p.nombre, 11);
     stream.write(p.apellidos, 20);
@@ -63,13 +63,12 @@ public:
 class FixedRecordWithMoveTheLast: public FixedRecord{
 private:
     int candetele = 0;
-
 public:
     FixedRecordWithMoveTheLast(string filename): FixedRecord(filename) {}
 
     vector<Alumno> load() override {
         vector<Alumno> alumnos;
-        ifstream file(filename, ios::in | ios::binary);
+        fstream file(filename, ios::in | ios::binary);
         if (!file.is_open()) throw ("No se pudo abrir el archivo");
         if (CantReg() == 0) {
             cout << "No hay registros" << endl;
@@ -88,7 +87,7 @@ public:
     }
 
     void add(Alumno record) override{
-        ofstream file(filename, ios::out | ios::in | ios::binary);
+        fstream file(filename, ios::out | ios::in | ios::binary);
         if(!file.is_open()){
             cout<<"No se puede abrir el archivo" <<endl ; 
             exit(1);
@@ -111,7 +110,7 @@ public:
 
     Alumno readRecord(int pos) override{
         Alumno record;
-        ifstream file(filename, ios::binary);
+        fstream file(filename, ios::binary | ios::in);
         if(!file.is_open()){
             cout<<"No se puede abrir el archivo_r" <<endl ; 
             exit(1);
@@ -124,7 +123,7 @@ public:
     }
 
     bool deleteRecord(int pos) override{
-        ofstream file(filename, ios::in | ios::out | ios::binary);
+        fstream file(filename, ios::in | ios::out | ios::binary);
         if(!file.is_open()) throw ("No se pudo abrir el archivo");
         
         int AllReg = CantReg();
@@ -164,31 +163,98 @@ public:
 
 class FixedRecordWithFreeList: public FixedRecord{
 private:
-    int header = -1; // indica la posicion del primer registro libre
+    int header; // indica que no hay registros eliminados
 
 public:
-    FixedRecordWithFreeList(string filename): FixedRecord(filename) {}
+    FixedRecordWithFreeList(string filename): FixedRecord(filename), header(-1) {}
     vector<Alumno> load() override{
         vector<Alumno> alumnos;
         ifstream file(filename, ios::in | ios::binary);
-        //implementar
+        if (!file.is_open()){
+            cout<<"No se puede abrir el archivo" <<endl ; 
+            exit(1);
+        }
+        file.seekg(0, ios::beg);
+        while(true){
+            Alumno al ; 
+            streampos pos = file.tellg();
+            file.read((char*)&al, sizeof(Alumno));
+            // si se llega al final del archivo, salir del bucle
+            if(file.eof()) break;
+            //verificar si el registro está eliminado
+            if(al.next == -2){
+                alumnos.push_back(al);
+            }
+        }
 
         return alumnos;
     }
+    //ofstream es para escribir en el archivo
     void add(Alumno record) override{
+        fstream file(filename, ios::in | ios::out | ios::binary);
+        if(!file.is_open()){
+            cout<<"No se puede abrir el archivo" <<endl ; 
+            exit(1);
+        }
+        int head = header;
+        if (head == -1) {  // No hay registros eliminados, agregar al final
+            file.seekp(0, ios::end);
+            file << record;
+        } else {  
+            //buscar la posicion de next en el registro eliminado
+            file.seekg(head * sizeof(Alumno) + sizeof(Alumno) - sizeof(int), ios::beg);
+            // Leer la posición del siguiente registro eliminado
+            int next;
+            file.read((char*)&next, sizeof(int));
+            // Actualizar el head de la free list
+            header = next;
+            // Escribir el registro en la posición del head
+            file.seekp(head * sizeof(Alumno), ios::beg);
+            file << record;
+        }
+        file.close();
+    }
+
+    Alumno readRecord(int pos) override{
+        Alumno record;
+        fstream file(filename, ios::binary | ios::in);
+        if(!file.is_open()){
+            cout<<"No se puede abrir el archivo_r" <<endl ; 
+            exit(1);
+        };
+        //solo cargar el registro si no está eliminado osea los que possen un next = -2
+        file.seekg(pos * sizeof(Alumno) + sizeof(Alumno) - sizeof(int), ios::beg);
+        int next;
+        file.read((char*)&next, sizeof(int));
+        if (next != -2) {
+            cout << "Registro eliminado" << endl;
+            exit(1);
+        }
+        file.seekg(pos * sizeof(Alumno), ios::beg);
+        file >> record;
+        file.close(); 
+        return record;
+    }
+
+    bool deleteRecord(int pos) override{
         ofstream file(filename, ios::in | ios::out | ios::binary);
         if(!file.is_open()){
             cout<<"No se puede abrir el archivo" <<endl ; 
             exit(1);
         }
-        if(header == -1){
-            file.seekp(0, ios::end);
-            file << record;
-        }else{
-            // leer el registro libre
-        }
+        file.seekp(pos * sizeof(Alumno) + sizeof(Alumno) - sizeof(int), ios::beg);
+        int next = header;
+        file.write((char*)&next, sizeof(int));
+        header = pos;
         file.close();
+        return true;
     }
+
+    int CantReg() override {
+        // falta
+        return 0;
+    }
+
 };
 
 // prueba de la clase MoveTheLast
@@ -207,7 +273,7 @@ void PruebaMoveTheLast(){
     file->add(a3);
     file->add(a4);
 
-    cout << "Cantidad de registros: " << file->CantReg() << endl;
+    //cout << "Cantidad de registros: " << file->CantReg() << endl;
 
     //leyendo alumnos
     cout<< "-------Leyendo los alumnos-------" << endl;
@@ -258,10 +324,78 @@ void PruebaMoveTheLast(){
     cout << "Cantidad de registros: " << file->CantReg() << endl;
 }
 
+// prueba de la clase FreeList
+void PruebaFreeList(){
+    FixedRecord* file = new FixedRecordWithFreeList("alumnos.dat");
+    //FixedRecordWithFreeList file("alumnos.dat");
+    
+    Alumno a1 = {"1234", "Juan", "Perez", "Sistemas", 5, 200.0};
+    Alumno a2 = {"5678", "Maria", "Lopez", "Industrial", 6, 250.0};
+    Alumno a3 = {"9101", "Pedro", "Gomez", "Civil", 7, 300.0};
+    Alumno a4 = {"1121", "Ana", "Torres", "Mecanica", 8, 350.0};
+
+    //agregando alumnos
+    file->add(a1);
+    file->add(a2);
+    file->add(a3);
+    file->add(a4);
+
+    cout << "Cantidad de registros: " << file->CantReg() << endl;
+
+    //leyendo alumnos
+    cout<< "-------Leyendo los alumnos-------" << endl;
+    vector<Alumno> alumnos = file->load();
+    for(Alumno a: alumnos){
+        cout << a.codigo << " " << a.nombre << " " << a.apellidos << " " << a.carrera << " " << a.ciclo << " " << a.mensualidad << endl;
+    }
+
+    cout<<"---------------------------------" << endl;
+    //leyendo un registro especifico 
+    int pos = 2;
+    cout << "Leyendo el registro en la posicion " << pos << ":" << endl; 
+    Alumno a = file->readRecord(pos);
+    cout << a.codigo << " " << a.nombre << " " << a.apellidos << " " << a.carrera << " " << a.ciclo << " " << a.mensualidad << endl;
+
+    cout<<"---------------------------------" << endl;
+    //eliminando un registro
+    int posElim = 0;
+    cout << "Eliminando el registro " << posElim << endl;
+    file->deleteRecord(posElim);
+
+    //cout << "Cantidad de registros: " << file->CantReg() << endl;
+
+    cout<<"---------------------------------" << endl;
+    //leyendo alumnos
+    cout<< "-------Leyendo los alumnos despues de eliminar un registro-------" << endl;
+    alumnos = file->load();
+    for(Alumno a: alumnos){
+        cout << a.codigo << " " << a.nombre << " " << a.apellidos << " " << a.carrera << " " << a.ciclo << " " << a.mensualidad << endl;
+    }
+
+    cout << "---------------------------------" << endl;
+    //agregando un nuevo registro
+    cout << "Agregando un nuevo registro" << endl;
+    Alumno a5 = {"1313", "Luis", "Garcia", "Mecatronica", 9, 400.0};
+    file->add(a5);
+
+    //cout << "Cantidad de registros: " << file->CantReg() << endl;
+
+    cout << "---------------------------------" << endl;
+    //leyendo alumnos
+    cout<< "-------Leyendo los alumnos despues de agregar un registro-------" << endl;
+    alumnos = file->load();
+    for(Alumno a: alumnos){
+        cout << a.codigo << " " << a.nombre << " " << a.apellidos << " " << a.carrera << " " << a.ciclo << " " << a.mensualidad << endl;
+    }
+
+    //cout << "Cantidad de registros: " << file->CantReg() << endl;
+}
 
 int main(){
     cout << "--------------------------------probando movethelast--------------------------------" << endl;
     PruebaMoveTheLast();
+    cout << "--------------------------------probando freelist--------------------------------" << endl;
+    PruebaFreeList();
 
     return 0 ; 
 }

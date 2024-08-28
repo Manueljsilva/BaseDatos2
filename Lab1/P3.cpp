@@ -114,7 +114,7 @@ public:
 
 };
 int main(){
-    VariableRecord vr("data.dat", "meta.dat");
+    VariableRecord vr("data_p3_data.dat", "data_p3_metadata.dat");
     cout << "-------------Cargando registros----------" << endl; 
     Matricula m1 = {"123", 1, 100.0, "observaciones"};
     Matricula m2 = {"456", 2, 200.0, "observaciones"};
@@ -126,8 +126,9 @@ int main(){
     for(Matricula m: matriculas){
         cout << m.codigo << " " << m.ciclo << " " << m.mensualidad << " " << m.observaciones << endl;
     }
-    cout << "-------------Leyendo registros----------" << endl;
-    Matricula m = vr.readRecord(1);
+    cout << "-------------Leyendo registro especifico----------" << endl;
+    int registro = 1;
+    Matricula m = vr.readRecord(registro);
     cout << m.codigo << " " << m.ciclo << " " << m.mensualidad << " " << m.observaciones << endl;
 
 

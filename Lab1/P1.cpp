@@ -39,243 +39,185 @@ void operator <<(fstream&stream , Alumno &p){
     stream.write((char*)&p.next, sizeof(int));
 }
 
-//clase padre
+enum DeleteType{
+    MOVE_THE_LAST,
+    FREE_LIST
+};
+
 class FixedRecord{
-protected:
+private:
     string filename ; 
-public:
-    FixedRecord(string filename): filename(filename) {
-        ofstream file(filename, ios::app | ios::binary);
-        if(!file.is_open()){
-            cout<<"No se puede abrir el archivo" <<endl ; 
-            exit(1);
-        }
-        file.close();
-    }
-    virtual vector<Alumno> load() = 0;
-    virtual void add(Alumno alumno) = 0;
-    virtual Alumno readRecord(int pos) = 0;
-    virtual bool deleteRecord(int pos) = 0;
-    virtual int CantReg() = 0;
-};
-
-//clase hija
-class FixedRecordWithMoveTheLast: public FixedRecord{
-private:
+    DeleteType deletetype;
     int candetele = 0;
+    int header = -1;
 public:
-    FixedRecordWithMoveTheLast(string filename): FixedRecord(filename) {}
-
-    vector<Alumno> load() override {
-        vector<Alumno> alumnos;
-        fstream file(filename, ios::in | ios::binary);
-        if (!file.is_open()) throw ("No se pudo abrir el archivo");
-        if (CantReg() == 0) {
-            cout << "No hay registros" << endl;
-            return alumnos;
-        }
-        // file.seekg(0, ios::beg);
-
-        int totalRecords = CantReg();
-        for (int i = 0; i < totalRecords; i++) {
-            Alumno al;
-            file >> al;
-            alumnos.push_back(al);
-        }
-        file.close();
-        return alumnos;
-    }
-
-    void add(Alumno record) override{
-        fstream file(filename, ios::out | ios::in | ios::binary);
-        if(!file.is_open()){
-            cout<<"No se puede abrir el archivo" <<endl ; 
-            exit(1);
-        }
-
-        // si hay un registro eliminado, se reutiliza su posición
-        if(candetele > 0){
-            int posToReuse = CantReg(); // aquí capturo la posición del último registro
-            file.seekp(posToReuse * sizeof(Alumno), ios::beg); // redirecciono el cursor en la posición a reutilizar
-            candetele--; // reduzco contador de registros eliminados
-        }
-        // si no hay registros eliminados, agrego al final
-        else {
-            file.seekp(0, ios::end); // redirecciono el cursor a la posición final
-        }
-
-        file << record;
-        file.close();
-    }
-
-    Alumno readRecord(int pos) override{
-        Alumno record;
-        fstream file(filename, ios::binary | ios::in);
-        if(!file.is_open()){
-            cout<<"No se puede abrir el archivo_r" <<endl ; 
-            exit(1);
-        };
-
-        file.seekg(pos * (sizeof(Alumno)), ios::beg);
-        file >> record;
-        file.close();
-        return record;
-    }
-
-    bool deleteRecord(int pos) override{
-        fstream file(filename, ios::in | ios::out | ios::binary);
-        if(!file.is_open()) throw ("No se pudo abrir el archivo");
+    FixedRecord(string filename, DeleteType deletetype) {
+        this->filename = filename;
+        this->deletetype = deletetype;
+        candetele = 0 ;
         
-        int AllReg = CantReg();
-        if(pos >= AllReg) {
-            cout << "No se puede eliminar el registro" << endl;
-            file.close();
-            return false;
-        }
-        int lastPos = AllReg - 1;
-        Alumno lastRecord = readRecord(lastPos);
-
-        if (pos != lastPos){
-            file.seekp(pos * sizeof(Alumno), ios::beg);
-            file << lastRecord;
-        }
-
-        candetele++;
-        file.close();
-        return true;
-    }
-
-    int CantReg() override {
-        ifstream file(filename, ios::binary | ios::in);
-        file.seekg(0, ios::end);
-        int size = file.tellg();
-        file.close();
-        return (size / sizeof(Alumno)) - candetele;
-    }
-
-    //destructor
-    ~FixedRecordWithMoveTheLast(){
-        //remove(filename.c_str());
-    }
-};
-
-// Alexis
-
-class FixedRecordWithFreeList: public FixedRecord{
-private:
-    int header; // indica que no hay registros eliminados
-
-public:
-    FixedRecordWithFreeList(string filename): FixedRecord(filename), header(-1) {}
-    vector<Alumno> load() override{
-        vector<Alumno> alumnos;
-        ifstream file(filename, ios::in | ios::binary);
-        if (!file.is_open()){
-            cout<<"No se puede abrir el archivo" <<endl ; 
+        ofstream file(filename, ios::binary | ios::app);
+        if(!file.is_open()){
+            cout<<"Error al abrir el archivo"<<endl;
             exit(1);
         }
-        // file.seekg(0, ios::beg);
-        while(true){
-            Alumno al ; 
-            streampos pos = file.tellg();
-            file.read((char*)&al, sizeof(Alumno));
-            // si se llega al final del archivo, salir del bucle
-            if(file.eof()) break;
-            //verificar si el registro está eliminado
-            if(al.next == -2){
+        file.close();
+    }
+    vector<Alumno> load(){
+        vector<Alumno> alumnos;
+        fstream file(filename, ios::in | ios::out | ios::binary);
+        if(!file.is_open()){
+            cout<<"No se puede abrir load" <<endl ; 
+            exit(1);
+        }
+        if(deletetype == MOVE_THE_LAST){
+            int totalRecords = CantReg();
+            for(int i = 0; i < totalRecords; i++){
+                Alumno al;
+                file >> al;
                 alumnos.push_back(al);
             }
+        }else if(deletetype == FREE_LIST){
+            while(true){
+                Alumno al;
+                streampos pos = file.tellg();
+                file.read((char*)&al, sizeof(Alumno));
+                if(file.eof()) break;
+                if(al.next == -2){
+                    alumnos.push_back(al);
+                }
+            }
         }
-
         file.close();
         return alumnos;
     }
-
-    //ofstream es para escribir en el archivo
-    void add(Alumno record) override{
+    void add(Alumno record){
         fstream file(filename, ios::in | ios::out | ios::binary);
         if(!file.is_open()){
-            cout<<"No se puede abrir el archivo" <<endl ; 
+            cout<<"No se puede abrir add" <<endl ; 
             exit(1);
         }
-        int head = header;
-        if (head == -1) {  // No hay registros eliminados, agregar al final
-            file.seekp(0, ios::end);
+        if(deletetype == MOVE_THE_LAST){
+            //si hay registros eliminados
+            if(candetele > 0){
+                int posToReuse = CantReg(); // aquí capturo la posición del último registro
+                file.seekp(posToReuse * sizeof(Alumno), ios::beg); // redirecciono el cursor en la posición a reutilizar
+                candetele--; // reduzco contador de registros eliminados
+            } // si no hay registros eliminados, se agrega al final del archivo
+            else{
+                file.seekp(0, ios::end);
+            }
             file << record;
-        } else {  
-            //buscar la posicion de next en el registro eliminado
-            file.seekg(head * sizeof(Alumno) + sizeof(Alumno) - sizeof(int), ios::beg);
-            // Leer la posición del siguiente registro eliminado
-            int next;
-            file.read((char*)&next, sizeof(int));
-            // Actualizar el head de la free list
-            header = next;
-            // Escribir el registro en la posición del head
-            file.seekp(head * sizeof(Alumno), ios::beg);
-            file << record;
+        } else if(deletetype == FREE_LIST){
+            int head = header;
+            if(head == -1){
+                file.seekp(0, ios::end);
+                file << record;
+            }else{
+                //buscar la posicion de next en el registro eliminado
+                file.seekg(head * sizeof(Alumno) + sizeof(Alumno) - sizeof(int), ios::beg);
+                // Leer la posición del siguiente registro eliminado
+                int next;
+                file.read((char*)&next, sizeof(int));
+                // Actualizar el head de la free list
+                header = next;
+                // Escribir el registro en la posición del head
+                file.seekp(head * sizeof(Alumno), ios::beg);
+                file << record;
+            }
         }
         file.close();
     }
-
-    Alumno readRecord(int pos) override{
+    Alumno readRecord(int pos) {
         Alumno record;
-        fstream file(filename, ios::binary | ios::in);
+        fstream file(filename, ios::in | ios::binary) ;
         if(!file.is_open()){
-            cout<<"No se puede abrir el archivo_r" <<endl ; 
-            exit(1);
-        };
-        //solo cargar el registro si no está eliminado osea los que possen un next = -2
-        file.seekg(pos * sizeof(Alumno) + sizeof(Alumno) - sizeof(int), ios::beg);
-        int next;
-        file.read((char*)&next, sizeof(int));
-        if (next != -2) {
-            cout << "Registro eliminado" << endl;
+            cout<<"No se puede abrir readRecord" <<endl ; 
             exit(1);
         }
-        file.seekg(pos * sizeof(Alumno), ios::beg);
-        file >> record;
-        file.close(); 
-
+        if(deletetype == MOVE_THE_LAST){
+            file.seekg(pos * (sizeof(Alumno)), ios::beg);
+            file >> record;
+        }else if(deletetype == FREE_LIST){
+            //solo cargar el registro si no está eliminado osea los que possen un next = -2
+            file.seekg(pos * sizeof(Alumno) + sizeof(Alumno) - sizeof(int), ios::beg);
+            int next;
+            file.read((char*)&next, sizeof(int));
+            if (next != -2) {
+                cout << "Registro eliminado" << endl;
+                exit(1);
+            }
+            file.seekg(pos * sizeof(Alumno), ios::beg);
+            file >> record;
+        }
+        file.close();
         return record;
     }
 
-    bool deleteRecord(int pos) override{
-        ofstream file(filename, ios::in | ios::out | ios::binary);
+    bool deleteRecord(int pos) {
+        fstream file(filename, ios::in | ios::out | ios::binary);
         if(!file.is_open()){
-            cout<<"No se puede abrir el archivo" <<endl ; 
+            cout<<"No se puede abrir deleteRecord" <<endl ; 
             exit(1);
         }
-        file.seekp(pos * sizeof(Alumno) + sizeof(Alumno) - sizeof(int), ios::beg);
-        int next = header;
-        file.write((char*)&next, sizeof(int));
-        header = pos;
-        file.close();
+        if(deletetype == MOVE_THE_LAST){
+            int AllReg = CantReg();
+            if(pos >= AllReg){
+                cout << "Posicion invalida delete record" << endl;
+                file.close();
+                return false ; 
+            }
+            int lastPos = AllReg - 1;
+            Alumno lastRecord = readRecord(lastPos);
 
-        return true;
-    }
-
-    int CantReg() override {
-        ifstream file(filename, ios::in | ios::binary);
-        int count = 0;
-        Alumno al;
-
-        // es necesario recorrer cada registro del archivo para identificar el valor del campo que me indica que no es un registro eliminados (.next)
-        while (true) {
-            file.read((char*)&al, sizeof(Alumno));
-            if (file.eof()) break;
-            // cuento registros no eliminados
-            if (al.next == -2) count++;
+            if (pos != lastPos){
+                file.seekp(pos * sizeof(Alumno), ios::beg);
+                file << lastRecord;
+            }
+            candetele++;
+        }else if(deletetype == FREE_LIST){
+            file.seekp(pos * sizeof(Alumno) + sizeof(Alumno) - sizeof(int), ios::beg);
+            int next = header;
+            file.write((char*)&next, sizeof(int));
+            header = pos;
         }
         file.close();
-
-        return count;
+        return true ; 
     }
+
+    int CantReg(){
+        fstream file(filename, ios::in | ios::out | ios::binary);
+        if(!file.is_open()){
+            cout<<"No se puede abrir CantReg" <<endl ; 
+            exit(1);
+        }
+        if(deletetype == MOVE_THE_LAST){
+            file.seekg(0, ios::end);
+            int size = file.tellg();
+            file.close();
+            return (size / sizeof(Alumno)) - candetele;
+        }else if(deletetype == FREE_LIST){
+            int count = 0;
+            Alumno al;
+            // es necesario recorrer cada registro del archivo para identificar el valor del campo que me indica que no es un registro eliminados (.next)
+            while (true) {
+                file.read((char*)&al, sizeof(Alumno));
+                if (file.eof()) break;
+                // cuento registros no eliminados
+                if (al.next == -2) count++;
+            }
+            file.close();
+
+            return count;
+        }
+        return 0;
+    }
+    ~FixedRecord(){}
 };
 
 // prueba de la clase MoveTheLast
 void PruebaMoveTheLast(){
-    FixedRecord* file = new FixedRecordWithMoveTheLast("alumnosMTL.dat");
-    //FixedRecordWithMoveTheLast file("alumnos.dat");
+    FixedRecord* file = new FixedRecord("alumnosMTL.dat", MOVE_THE_LAST);
     
     Alumno a1 = {"1234", "Juan", "Perez", "Sistemas", 5, 200.0};
     Alumno a2 = {"5678", "Maria", "Lopez", "Industrial", 6, 250.0};
@@ -341,8 +283,7 @@ void PruebaMoveTheLast(){
 
 // prueba de la clase FreeList
 void PruebaFreeList(){
-    FixedRecord* file = new FixedRecordWithFreeList("alumnosFL.dat");
-    //FixedRecordWithFreeList file("alumnos.dat");
+    FixedRecord* file = new FixedRecord("alumnosFL.dat", FREE_LIST);
     
     Alumno a1 = {"1234", "Juan", "Perez", "Sistemas", 5, 200.0};
     Alumno a2 = {"5678", "Maria", "Lopez", "Industrial", 6, 250.0};

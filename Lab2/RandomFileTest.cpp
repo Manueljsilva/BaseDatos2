@@ -48,6 +48,7 @@ private:
   string indexName;
   //Agregue un atributo para mantener el indice en ram
   map<string, long> index; 
+  int CantDelete = 0;
   
 public:
   RandomFile(string _fileName) {
@@ -100,7 +101,15 @@ public:
   * Escribe el registro al final del archivo de datos. Se actualiza el indice. 
   */
   void write_record(Record record) {
-    ofstream file(fileName, ios::binary | ios::ate | ios::app);
+    fstream file(fileName, ios::binary | ios::ate | ios::app);
+    if( CantDelete > 0){
+      //buscar el primer registro eliminado
+      int posToReuse = CantReg();
+      file.seekp(posToReuse * sizeof(Record), ios::beg);
+      CantDelete--;
+    } else {
+      file.seekp(0, ios::end);
+    }
     long pos = file.tellp(); // tellp() regresa la posición actual del puntero de escritura
     file.write((char *)&record, sizeof(record));
     file.close();
@@ -117,17 +126,16 @@ public:
   * Busca un registro que coincida con la key
   */
   Record* find(string key) {
+  
     if(index.find(key) == index.end()){
       cout << "No se encontro el registro" << endl;
       return nullptr;
-
     }
     ifstream dataFile(fileName, ios::binary);
     dataFile.seekg(index[key]);
     Record* record = new Record;
-    dataFile.read((char *)record, sizeof(*record));
-    dataFile.close();
-
+    dataFile.read((char*)record, sizeof(*record));
+    dataFile.close();   
     return record;
   }
 
@@ -160,6 +168,63 @@ public:
   map<string , long> getIndex(){
     return index;
   }
+  void removeFromIndex(string key){
+    auto it = index.find(key);
+    if(it != index.end()){
+      index.erase(it);
+    }
+  }
+  // eliminando el archivo usando MOVE_THE_LAST
+  bool remove(string key) {
+    if(index.find(key) == index.end()){
+        cout << "No se encontró el registro" << endl;
+        return false;
+    }
+    
+    fstream file(fileName, ios::in | ios::out | ios::binary);
+    int AllReg = CantReg();
+    int lastPos = AllReg - 1;
+    
+    // Lee el último registro
+    Record lastRecord = readRecord(lastPos);
+
+    // Si el registro a eliminar no es el último, lo reemplaza
+    if (index[key] != lastPos) {
+        file.seekp(index[key] * sizeof(Record), ios::beg);
+        file.write((char *)&lastRecord, sizeof(Record));
+
+        // Actualiza el índice del último registro
+        index[lastRecord.getKey()] = index[key];
+    }
+
+    CantDelete++;
+    removeFromIndex(key); // Elimina la entrada del índice
+    file.close();
+    
+    return true;
+  }
+
+  Record readRecord(int pos) {
+    Record record;
+    fstream file(fileName, ios::in | ios::binary) ;
+    if(!file.is_open()){
+      cout<<"No se puede abrir readRecord" <<endl ; 
+      exit(1);
+    }
+    file.seekg(pos * sizeof(Record), ios::beg);
+    file.read((char*)&record, sizeof(Record));
+    file.close();
+    return record;
+  }
+  int CantReg(){
+    ifstream file(fileName, ios::binary);
+    file.seekg(0, ios::end);
+    int total = file.tellg() / sizeof(Record);
+    file.close();
+    return total - CantDelete;
+  }
+
+
   void buildFromCSV(string filename){
     ifstream file(filename);
     if(!file.is_open()){
@@ -192,32 +257,48 @@ public:
 
 //--------------- testing ------------------//
 void testLeerIndice(RandomFile &rf) {
-    assert(!rf.getIndex().empty() && "El índice no debería estar vacío después de leer desde el archivo CSV.");
-    cout << "testLeerIndice pasado." << endl;
+  assert(!rf.getIndex().empty() && "El índice no debería estar vacío después de leer desde el archivo CSV.");
+  cout << "testLeerIndice pasado." << endl;
 }
 
 void testBuscarRegistro(RandomFile &rf, Record otro) { //ants habia un record &otro
-    Record* result = rf.find(otro.getKey());   
-    assert((*result) == otro && "El registro no concuerda con el registrado en BD.");    
-    cout << "testBuscarRegistro para el codigo " << otro.getKey() << " pasado." << endl;
+  Record* result = rf.find(otro.getKey());   
+  assert((*result) == otro && "El registro no concuerda con el registrado en BD.");    
+  cout << "testBuscarRegistro para el codigo " << otro.getKey() << " pasado." << endl;
 }
+
+void testEliminarRegistro(RandomFile &rf , Record otro) {
+  rf.remove(otro.getKey());
+  Record* result = rf.find(otro.getKey());
+  assert(result == nullptr && "El registro no debería existir después de eliminarlo.");
+  cout << "testEliminarRegistro para el codigo " << otro.getKey() << " pasado." << endl;
+}
+void testReingresandoDatos(RandomFile &rf){
+  rf.write_record(Record("23803540", "Isabel", "Gil", 5));
+  rf.write_record(Record("66994658", "Marta", "Sanz", 3));
+  rf.write_record(Record("21678159", "Vicente", "Garrido", 1));
+  cout << "Todos los tests de reingreso de datos pasaron correctamente." << endl;
+}
+
 
 int main() {
   RandomFile rf("rf_data" );
-  cout<<"hasta aca bien"<<endl;
   rf.buildFromCSV("datos.csv");
-  cout<<"hasta aca bien 2"<<endl;
   testLeerIndice(rf);
-  cout<<"hasta aca bien 3"<<endl;
   testBuscarRegistro(rf, Record("23803540", "Isabel", "Gil", 5));
   testBuscarRegistro(rf, Record("51979300", "Montserrat", "Navarro", 2));
   testBuscarRegistro(rf, Record("66994658", "Marta", "Sanz", 3));
   testBuscarRegistro(rf, Record("21678159", "Vicente", "Garrido", 1));
   testBuscarRegistro(rf, Record("66384772", "Francisca", "Rubio", 10));
   testBuscarRegistro(rf, Record("19425339", "Rosa", "Ramos", 4));    
-  cout << "Todos los tests pasaron correctamente." << endl;
 
-  // Agruegue mas casos de prueba.
+  // probando eliminación
+  testEliminarRegistro(rf , Record("23803540", "Isabel", "Gil", 5));
+  testEliminarRegistro(rf , Record("66994658", "Marta", "Sanz", 3));
+  testEliminarRegistro(rf , Record("21678159", "Vicente", "Garrido", 1));
+  testReingresandoDatos(rf);
   
+  // test de volver a buscar registro
+  cout << "Todos los tests pasaron correctamente." << endl;
   return 0;
 }

@@ -69,11 +69,11 @@ public:
       cout<<"no abre el index File" <<endl;
       exit(1);
     }
-    string codigo ; 
+    char codigo[12];
     long pos;
     while (indexFile.read((char *)&codigo, 12) && indexFile.read((char *)&pos, sizeof(pos)))
     {
-        index[codigo] = pos;
+      index[codigo] = pos;
     }
     indexFile.close();
   }
@@ -127,6 +127,7 @@ public:
     Record* record = new Record;
     dataFile.read((char *)record, sizeof(*record));
     dataFile.close();
+
     return record;
   }
 

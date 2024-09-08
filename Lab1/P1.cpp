@@ -48,21 +48,22 @@ class FixedRecord{
 private:
     string filename ; 
     DeleteType deletetype;
-    int candetele = 0;
+    int candelete = 0;
     int header = -1;
 public:
     FixedRecord(string filename, DeleteType deletetype) {
         this->filename = filename;
         this->deletetype = deletetype;
-        candetele = 0 ;
+        candelete = 0 ;
         
-        ofstream file(filename, ios::binary | ios::app);
+        ofstream file(filename, ios::app | ios::binary);
         if(!file.is_open()){
             cout<<"Error al abrir el archivo"<<endl;
             exit(1);
         }
         file.close();
     }
+    
     vector<Alumno> load(){
         vector<Alumno> alumnos;
         fstream file(filename, ios::in | ios::out | ios::binary);
@@ -91,6 +92,7 @@ public:
         file.close();
         return alumnos;
     }
+    
     void add(Alumno record){
         fstream file(filename, ios::in | ios::out | ios::binary);
         if(!file.is_open()){
@@ -99,10 +101,10 @@ public:
         }
         if(deletetype == MOVE_THE_LAST){
             //si hay registros eliminados
-            if(candetele > 0){
+            if(candelete > 0){
                 int posToReuse = CantReg(); // aquí capturo la posición del último registro
                 file.seekp(posToReuse * sizeof(Alumno), ios::beg); // redirecciono el cursor en la posición a reutilizar
-                candetele--; // reduzco contador de registros eliminados
+                candelete--; // reduzco contador de registros eliminados
             } // si no hay registros eliminados, se agrega al final del archivo
             else{
                 file.seekp(0, ios::end);
@@ -128,6 +130,7 @@ public:
         }
         file.close();
     }
+    
     Alumno readRecord(int pos) {
         Alumno record;
         fstream file(filename, ios::in | ios::binary) ;
@@ -174,7 +177,7 @@ public:
                 file.seekp(pos * sizeof(Alumno), ios::beg);
                 file << lastRecord;
             }
-            candetele++;
+            candelete++;
         }else if(deletetype == FREE_LIST){
             file.seekp(pos * sizeof(Alumno) + sizeof(Alumno) - sizeof(int), ios::beg);
             int next = header;
@@ -195,7 +198,7 @@ public:
             file.seekg(0, ios::end);
             int size = file.tellg();
             file.close();
-            return (size / sizeof(Alumno)) - candetele;
+            return (size / sizeof(Alumno)) - candelete;
         }else if(deletetype == FREE_LIST){
             int count = 0;
             Alumno al;
@@ -212,6 +215,7 @@ public:
         }
         return 0;
     }
+    
     ~FixedRecord(){}
 };
 

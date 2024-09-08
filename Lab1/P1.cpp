@@ -202,7 +202,7 @@ public:
         }else if(deletetype == FREE_LIST){
             int count = 0;
             Alumno al;
-            // es necesario recorrer cada registro del archivo para identificar el valor del campo que me indica que no es un registro eliminados (.next)
+            // es necesario recorrer cada registro del archivo para identificar el valor del campo que me indica que no es un registro eliminado (.next)
             while (true) {
                 file.read((char*)&al, sizeof(Alumno));
                 if (file.eof()) break;
